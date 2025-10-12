@@ -1,83 +1,78 @@
 # 🏋️‍♂️ fitnesspark-attendance
 
-A Python-based Google Cloud project that monitors live gym attendance from the Fitnesspark website and tracks it over time.
+A Python-based cloud project that monitors live gym attendance data from the Fitnesspark Trafo Baden website and stores it in Google Cloud Storage for historical analysis and visualization.
 
-## 🚀 Overview
-This project:
-- Scrapes the public attendance data from the Fitnesspark website every 10 minutes.
-- Stores the data for trend analysis.
-- Provides a simple dashboard to visualize attendance now and historically.
+---
 
-## 🧱 Tech Stack
-- **Python 3.9+**
-- **Google Cloud Run** / **Cloud Scheduler**
-- **Google Cloud Storage** or **Firestore**
-- **BeautifulSoup4** for scraping
-- **Matplotlib** or **Plotly** for visualization
+## 🧭 Overview
 
-## ⚙️ Project Structure# 🏋️‍♂️ fitnesspark-attendance
+The project periodically fetches the current visitor count from the Fitnesspark Baden Trafo web page and logs it to a Google Cloud Storage bucket as structured JSONL records. Each entry includes:
 
-A Python-based Google Cloud project that monitors live gym attendance from the Fitnesspark website and tracks it over time.
+* Timestamp
+* Visitor count
+* Status (e.g., `ok`, `closed_no_data`, `no_visitors`, or `error`)
 
-## 🚀 Overview
+This enables later visualization of gym attendance trends over time.
 
-This project:
+---
 
-* Scrapes the public attendance data from the Fitnesspark website every 10 minutes.
-* Stores the data for trend analysis.
-* Provides a simple dashboard to visualize attendance now and historically.
-
-## 🧱 Tech Stack
-
-* **Python 3.9+**
-* **Google Cloud Run** / **Cloud Scheduler**
-* **Google Cloud Storage** or **Firestore**
-* **BeautifulSoup4** for scraping
-* **Matplotlib** or **Plotly** for visualization
-
-## ⚙️ Project Structure
+## ⚙️ Architecture
 
 ```
-fitnesspark-attendance/
-├── scraper/
-│   └── fetcher.py        # Fetches live attendance data
-├── run.py                # Entry point for scheduler / Cloud Run
-├── requirements.txt      # Python dependencies
-├── README.md             # Project documentation
-└── .gitignore            # Ignored files and folders
+Cloud Scheduler → Cloud Run Job → Python scraper → Cloud Storage
 ```
 
-## 🧰 Development
+1. **Cloud Scheduler** triggers the job every 10 minutes.
+2. **Cloud Run Job** runs the Python scraper container.
+3. **Python scraper** fetches data from the Fitnesspark website.
+4. **Cloud Storage** stores results in `gs://fitnesspark-attendance-data/attendance/attendance_data.jsonl`.
 
-1. Clone this repo:
+---
 
-   ```bash
-   git clone git@github.com:yourusername/fitnesspark-attendance.git
-   cd fitnesspark-attendance
-   ```
+## 🧩 Components
 
-2. Create and activate a virtual environment:
+* `scraper/fetcher.py` – Fetches visitor data from the Fitnesspark website.
+* `scraper/storage.py` – Appends results to Cloud Storage (JSONL format).
+* `run.py` – Main entry point for Cloud Run Job execution.
+* `requirements.txt` – Python dependencies.
+* `README_DEPLOYMENT.md` – Full deployment instructions.
 
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+---
 
-3. Run the scraper locally:
+## 🧰 Local Development
 
-   ```bash
-   python run.py
-   ```
+To run locally for testing:
 
-## 🗕️ Roadmap
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-* [ ] Implement the scraper logic
-* [ ] Store results in Cloud Storage
-* [ ] Deploy as a Cloud Run service
-* [ ] Schedule runs every 10 minutes
-* [ ] Build a simple web dashboard
+# Install dependencies
+pip install -r requirements.txt
 
-## 🛡️ License
+# Run the scraper manually
+python run.py
+```
 
-MIT License (add later if desired)
+You will need a valid `gcloud auth application-default login` session for credentials to access Cloud Storage.
+
+---
+
+## ☁️ Deployment
+
+Deployment and automation details (including containerization, Cloud Run Job creation, and Scheduler setup) are documented in [**README_DEPLOYMENT.md**](./README_DEPLOYMENT.md).
+
+---
+
+## 📊 Future Enhancements
+
+* Web dashboard for real-time and historical attendance visualization.
+* Data quality monitoring and alerting.
+* Support for multiple Fitnesspark locations.
+
+---
+
+## 🪪 License
+
+MIT License © 2025 Pascal D. Meier
