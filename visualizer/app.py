@@ -72,7 +72,7 @@ def compute_weekly_profiles(df):
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
 
     # Group by weekday and time to get average visitor counts
-    df_weekly = df.groupby(["weekday", "time"])["visitors"].mean().reset_index()
+    df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
 
     # Sort weekdays to ensure Monday→Sunday order
     weekday_order = [
