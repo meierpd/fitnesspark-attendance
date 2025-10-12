@@ -59,7 +59,9 @@ def compute_today_vs_average(df):
     # Get today's data
     df_today = df[df["timestamp"].dt.date == today_date].copy()
     df_today = df_today[["time", "count"]]
-
+    # Filter to open hours (e.g., 06:30–22:00)
+    df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
+    df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
     return df_today, df_avg
 
 
