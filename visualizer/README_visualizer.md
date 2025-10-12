@@ -4,7 +4,7 @@ This visualizer is a Flask-based dashboard that reads gym attendance data from *
 
 It provides:
 
-* 🔢 **Today vs Typical (Same Weekday)** comparison chart
+* 🔢 **Today vs Typical (Same Weekday)** comparison chart (focused on open hours 06:30–22:00)
 * ⏱️ **All-Time Attendance** trend
 * 🗒️ **Weekly Summary Table (Last 4 Weeks)** including average visitors per half-hour and daily peak counts
 * ⛔ **Built-in rate limiter** to protect against excessive refreshes or abuse
@@ -74,7 +74,7 @@ Visit that link to access your dashboard.
 
 ---
 
-## 🔒 Security and Cost Control
+## 🔐 Security and Cost Control
 
 ### Built-in Rate Limiter
 
@@ -115,16 +115,35 @@ Cloud Run and Cloud Storage have generous free tiers. Occasional refreshes or no
 
 ---
 
-## 🔄 Redeploy After Changes
+## 🔁 Redeploy After Code Changes
 
-Whenever you modify the dashboard:
+Whenever you modify the dashboard (Python, HTML, or data logic):
+
+### Step 1 — Rebuild the container image
 
 ```bash
+cd ~/src/fitnesspark-attendance/visualizer
+export PROJECT_ID=fitnesspark-attendance
+export IMAGE="europe-west6-docker.pkg.dev/${PROJECT_ID}/fitnesspark-attendance/visualizer:latest"
+
 gcloud builds submit --tag $IMAGE
+```
+
+### Step 2 — Redeploy the updated service
+
+```bash
 gcloud run deploy fitnesspark-visualizer \
   --image $IMAGE \
   --region europe-west6 \
   --allow-unauthenticated
+```
+
+✅ The URL stays the same, and Cloud Run will automatically create a new revision.
+
+To verify deployment logs:
+
+```bash
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="fitnesspark-visualizer"' --limit 50 --format="value(textPayload)"
 ```
 
 ---
@@ -133,7 +152,7 @@ gcloud run deploy fitnesspark-visualizer \
 
 ### Charts
 
-1. **Today vs Typical (Same Weekday)** – compares today’s attendance with the average of the past 4 weeks for the same weekday.
+1. **Today vs Typical (Same Weekday)** – compares today’s attendance with the average of the past 4 weeks for the same weekday, limited to gym opening hours (06:30–22:00).
 2. **All-Time Attendance** – shows attendance counts over time.
 
 ### Summary Table
@@ -150,7 +169,7 @@ Example:
 
 ---
 
-## 👍 Tips
+## 💡 Tips
 
 * Refresh the page to get the **latest data** (new data logged every 10 minutes).
 * You can enable automatic refresh with:
@@ -172,5 +191,6 @@ Your visualizer is a secure, auto-updating, zero-maintenance dashboard that:
 
 * Fetches live data from Cloud Storage
 * Visualizes trends and patterns
+* Focuses on open hours for clear insights
 * Protects against spam
 * Runs fully serverless on Google Cloud Run
