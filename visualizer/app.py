@@ -1,14 +1,33 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, request, abort
 from google.cloud import storage
 import pandas as pd
-import io
 from datetime import datetime, timedelta
+from time import time
+import io
+import logging
 
 app = Flask(__name__)
 
 BUCKET_NAME = "fitnesspark-attendance-data"
 FILE_PATH = "attendance/attendance_data.jsonl"
+app = Flask(__name__)
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("FitnessparkVisualizer")
+
+# In-memory rate limiter
+last_access = {}
+
+@app.before_request
+def limit_requests():
+    """
+    Simple IP-based rate limiter: allow 1 request every 2 seconds per IP.
+    """
+    ip = request.remote_addr
+    now = time()
+    if ip in last_access and now - last_access[ip] < 2:
+        abort(429)  # Too Many Requests
+    last_access[ip] = now
 
 def load_data():
     client = storage.Client()
