@@ -71,6 +71,12 @@
         <canvas id="historyChart"></canvas>
     </div>
 
+    <!-- Chart 3 -->
+    <div class="chart-container">
+        <h2>Weekly Attendance Patterns (Averages over Last 4 Weeks)</h2>
+        <canvas id="weeklyChart"></canvas>
+    </div>
+
     <!-- Table -->
     <div class="chart-container">
       <h2>📅 Weekly Summary (Last 4 Weeks)</h2>
@@ -113,6 +119,7 @@
         const dataHistory = {{ history | tojson }};
         const summaryData = {{ summary | tojson }};
         const peaksData = {{ peaks | tojson }};
+        const weeklyProfiles = {{ weekly_profiles | tojson }};
 
         // --- Chart 1: Today vs Typical ---
         const ctx1 = document.getElementById('todayChart').getContext('2d');
@@ -172,6 +179,38 @@
                 },
                 plugins: {
                     legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // --- Chart 3: Weekly Attendance Patterns ---
+        const grouped = {};
+        weeklyProfiles.forEach(row => {
+            if (!grouped[row.weekday]) grouped[row.weekday] = { times: [], values: [] };
+            grouped[row.weekday].times.push(row.time);
+            grouped[row.weekday].values.push(row.visitors);
+        });
+
+        const colors = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1'];
+        const ctx3 = document.getElementById('weeklyChart').getContext('2d');
+        new Chart(ctx3, {
+            type: 'line',
+            data: {
+                labels: grouped['Monday'] ? grouped['Monday'].times : [],
+                datasets: Object.keys(grouped).map((day, i) => ({
+                    label: day,
+                    data: grouped[day].values,
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '33',
+                    fill: false,
+                    tension: 0.3
+                }))
+            },
+            options: {
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    x: { title: { display: true, text: 'Time of Day' } },
+                    y: { title: { display: true, text: 'Average Visitors' }, beginAtZero: true }
                 }
             }
         });

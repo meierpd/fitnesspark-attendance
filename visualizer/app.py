@@ -18,6 +18,7 @@ logger = logging.getLogger("FitnessparkVisualizer")
 # In-memory rate limiter
 last_access = {}
 
+
 @app.before_request
 def limit_requests():
     """
@@ -28,6 +29,7 @@ def limit_requests():
     if ip in last_access and now - last_access[ip] < 2:
         abort(429)  # Too Many Requests
     last_access[ip] = now
+
 
 def load_data():
     client = storage.Client()
@@ -65,6 +67,31 @@ def compute_today_vs_average(df):
     return df_today, df_avg
 
 
+def compute_weekly_profiles(df):
+    df["weekday"] = df["timestamp"].dt.day_name()
+    df["time"] = df["timestamp"].dt.strftime("%H:%M")
+
+    # Group by weekday and time to get average visitor counts
+    df_weekly = df.groupby(["weekday", "time"])["visitors"].mean().reset_index()
+
+    # Sort weekdays to ensure Monday→Sunday order
+    weekday_order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+    df_weekly["weekday"] = pd.Categorical(
+        df_weekly["weekday"], categories=weekday_order, ordered=True
+    )
+    df_weekly = df_weekly.sort_values(["weekday", "time"])
+
+    return df_weekly
+
+
 def compute_weekly_summary(df):
     now = datetime.now()
     four_weeks_ago = now - timedelta(weeks=4)
@@ -99,6 +126,9 @@ def index():
     data_avg = df_avg.to_dict(orient="records")
     data_history = df[["timestamp", "count"]].to_dict(orient="records")
 
+    weekly_profiles = compute_weekly_profiles(df)
+    weekly_profiles_json = weekly_profiles.to_dict(orient="records")
+
     df_summary, df_peaks = compute_weekly_summary(df)
     summary = df_summary.to_dict(orient="records")
     peaks = df_peaks.to_dict(orient="records")
@@ -110,6 +140,7 @@ def index():
         history=data_history,
         summary=summary,
         peaks=peaks,
+        weekly_profiles=weekly_profiles_json
     )
 
 
