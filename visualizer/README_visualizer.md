@@ -1,142 +1,176 @@
-📊 Fitnesspark Visualizer
+# 🏠 Fitnesspark Attendance Visualizer
 
-A lightweight Flask web application that displays live and historical gym attendance data collected by the fitnesspark-attendance project.
+This visualizer is a Flask-based dashboard that reads gym attendance data from **Google Cloud Storage**, processes it in real time, and displays it interactively using **Chart.js**.
 
-The app reads attendance logs from Google Cloud Storage, computes trends using pandas, and visualizes them through Chart.js in a responsive dashboard served by Google Cloud Run.
+It provides:
 
-⸻
+* 🔢 **Today vs Typical (Same Weekday)** comparison chart
+* ⏱️ **All-Time Attendance** trend
+* 🗒️ **Weekly Summary Table (Last 4 Weeks)** including average visitors per half-hour and daily peak counts
+* ⛔ **Built-in rate limiter** to protect against excessive refreshes or abuse
 
-🧭 Overview
+---
 
-Architecture
+## ⚙️ Project Structure
 
-Cloud Storage → Flask → Chart.js → Cloud Run (public URL)
+```
+visualizer/
+├── app.py                  # Flask app with charts, data loading, and rate limiting
+├── requirements.txt        # Dependencies
+├── Dockerfile              # Container definition
+└── templates/
+    └── index.html          # HTML + Chart.js dashboard
+```
 
-Features
-	•	Today vs Typical Chart — compares current day’s attendance to the average of the same weekday over the last 4 weeks.
-	•	All-Time Chart — shows total attendance history over time.
-	•	Live updates — the dashboard always shows the latest data when refreshed.
-	•	Optional auto-refresh — can refresh automatically every 10 minutes for convenience.
+---
 
-Data Source
+## 🛠️ Local Development
 
-The app expects a file in Cloud Storage:
+### 1. Install dependencies
 
-gs://fitnesspark-attendance-data/attendance/attendance_data.jsonl
-
-Each line represents a record:
-
-{"timestamp": "2025-10-12T20:28:51.661552", "count": 64, "status": "ok"}
-
-
-⸻
-
-⚙️ Local Development
-
-1. Set up Python environment
-
-cd visualizer
-python3 -m venv venv
-source venv/bin/activate
+```bash
 pip install -r requirements.txt
+```
 
-2. Run locally
+### 2. Run locally
 
-Make sure you are authenticated with Google Cloud:
-
-gcloud auth application-default login
+```bash
 python app.py
+```
 
-Then open http://localhost:8080 to view the dashboard.
+Then open [http://localhost:8080](http://localhost:8080) to view the dashboard.
 
-⸻
+> Note: The app connects to your Google Cloud project automatically if you’re authenticated with `gcloud auth application-default login`.
 
-🚀 Deployment to Google Cloud Run
+---
 
-1. Set environment variables
+## 🚀 Deployment to Cloud Run
 
+### 1. Build the image
+
+```bash
 export PROJECT_ID=fitnesspark-attendance
-export REGION=europe-west6
 export IMAGE="europe-west6-docker.pkg.dev/${PROJECT_ID}/fitnesspark-attendance/visualizer:latest"
 
-2. Build and push the image
-
-cd visualizer
 gcloud builds submit --tag $IMAGE
+```
 
-3. Deploy to Cloud Run
+### 2. Deploy to Cloud Run
 
+```bash
 gcloud run deploy fitnesspark-visualizer \
   --image $IMAGE \
-  --region $REGION \
-  --platform managed \
-  --allow-unauthenticated \
-  --memory 512Mi \
-  --cpu 1
+  --region europe-west6 \
+  --allow-unauthenticated
+```
 
-After deployment, you’ll see:
+Once deployed, you’ll see a public URL like:
 
-Service URL: https://fitnesspark-visualizer-xxxxxx-ew.a.run.app
+```
+https://fitnesspark-visualizer-xxxxxx-ew.a.run.app
+```
 
-That’s your live dashboard 🌍
+Visit that link to access your dashboard.
 
-Redeploying the same service keeps the same URL — only a new revision is created.
+---
 
-⸻
+## 🔒 Security and Cost Control
 
-🧰 Maintenance & Troubleshooting
+### Built-in Rate Limiter
 
-View logs
+The app uses a simple in-memory rate limiter:
 
-gcloud logs read \
-  'resource.type="cloud_run_revision" AND resource.labels.service_name="fitnesspark-visualizer"' \
-  --limit 50 --format="value(textPayload)"
+```python
+@app.before_request
+def limit_requests():
+    ip = request.remote_addr
+    now = time()
+    if ip in last_access and now - last_access[ip] < 2:
+        abort(429)
+    last_access[ip] = now
+```
 
-Update after code changes
+This prevents refresh spam by limiting requests to **one every 2 seconds per IP**.
 
-gcloud builds submit --tag $IMAGE
-gcloud run deploy fitnesspark-visualizer --image $IMAGE --region $REGION
+### Optional: Restrict Access
 
-Delete old revisions
+You can make the dashboard private:
 
-(Optional, to free resources)
+```bash
+gcloud run services update fitnesspark-visualizer --no-allow-unauthenticated
+```
 
-gcloud run revisions list --region $REGION
-gcloud run revisions delete REVISION_NAME --region $REGION
+Then grant yourself access:
 
-
-⸻
-
-🔄 Data Refresh Behavior
-	•	The dashboard always shows the newest data from Cloud Storage when reloaded.
-	•	Since the scraper runs every 10 minutes, simply refreshing the page fetches new attendance data.
-	•	(Optional) You can make it auto-refresh by adding this line to the <head> of index.html:
-
-<meta http-equiv="refresh" content="600">
-
-This reloads the page every 10 minutes automatically.
-
-⸻
-
-🔒 Optional: Make It Private
-
-If you prefer to restrict access, remove --allow-unauthenticated from the deploy command and grant access only to specific Google accounts:
-
+```bash
 gcloud run services add-iam-policy-binding fitnesspark-visualizer \
-  --member="user:youremail@gmail.com" \
+  --member="user:pascal.d.meier@gmail.com" \
   --role="roles/run.invoker" \
-  --region $REGION
+  --region europe-west6
+```
 
+### Cost Notes
 
-⸻
+Cloud Run and Cloud Storage have generous free tiers. Occasional refreshes or normal use will **stay well within free limits**.
 
-✅ Summary
-	•	Main Chart: Today vs Typical (same weekday, 4-week average)
-	•	Secondary Chart: All-Time Attendance
-	•	Automatic Updates: Refresh manually or every 10 minutes
-	•	Tech Stack: Flask + pandas + Chart.js + Cloud Run
-	•	Data Source: Cloud Storage JSONL file
+---
 
-⸻
+## 🔄 Redeploy After Changes
 
-💡 Future idea: Add color-coded indicators like “Busier than usual” or “Quieter than usual” for instant visual context.
+Whenever you modify the dashboard:
+
+```bash
+gcloud builds submit --tag $IMAGE
+gcloud run deploy fitnesspark-visualizer \
+  --image $IMAGE \
+  --region europe-west6 \
+  --allow-unauthenticated
+```
+
+---
+
+## 🔢 Data and Charts
+
+### Charts
+
+1. **Today vs Typical (Same Weekday)** – compares today’s attendance with the average of the past 4 weeks for the same weekday.
+2. **All-Time Attendance** – shows attendance counts over time.
+
+### Summary Table
+
+* Shows **average visitor counts** per half-hour slot for each weekday (last 4 weeks)
+* Displays **daily peak** visitor count and the **time of that peak**
+
+Example:
+
+| Day | 06:30–07:00 | 07:00–08:00 | … | 21:00–22:00 | Peak | Time  |
+| --- | ----------- | ----------- | - | ----------- | ---- | ----- |
+| Mon | 35          | 58          | … | 44          | 120  | 18:10 |
+| Tue | 40          | 65          | … | 47          | 135  | 18:30 |
+
+---
+
+## 👍 Tips
+
+* Refresh the page to get the **latest data** (new data logged every 10 minutes).
+* You can enable automatic refresh with:
+
+  ```html
+  <meta http-equiv="refresh" content="600"> <!-- every 10 min -->
+  ```
+* Logs are visible in Cloud Run:
+
+  ```bash
+  gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="fitnesspark-visualizer"' --limit 50
+  ```
+
+---
+
+## 🛡️ Summary
+
+Your visualizer is a secure, auto-updating, zero-maintenance dashboard that:
+
+* Fetches live data from Cloud Storage
+* Visualizes trends and patterns
+* Protects against spam
+* Runs fully serverless on Google Cloud Run
