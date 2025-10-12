@@ -6,6 +6,7 @@ It provides:
 
 * 🔢 **Today vs Typical (Same Weekday)** comparison chart (focused on open hours 06:30–22:00)
 * ⏱️ **All-Time Attendance** trend
+* 📈 **Weekly Attendance Patterns** — multi-line chart showing each weekday’s average attendance profile over time (last 4 weeks)
 * 🗒️ **Weekly Summary Table (Last 4 Weeks)** including average visitors per half-hour and daily peak counts
 * ⛔ **Built-in rate limiter** to protect against excessive refreshes or abuse
 
@@ -19,7 +20,7 @@ visualizer/
 ├── requirements.txt        # Dependencies
 ├── Dockerfile              # Container definition
 └── templates/
-    └── index.html          # HTML + Chart.js dashboard
+    └── index.html          # HTML + Chart.js dashboard (includes 3 charts + table)
 ```
 
 ---
@@ -154,6 +155,7 @@ gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.serv
 
 1. **Today vs Typical (Same Weekday)** – compares today’s attendance with the average of the past 4 weeks for the same weekday, limited to gym opening hours (06:30–22:00).
 2. **All-Time Attendance** – shows attendance counts over time.
+3. **Weekly Attendance Patterns** – multi-line chart comparing the average visitor trends across weekdays (each line represents one weekday’s average attendance profile over the past 4 weeks).
 
 ### Summary Table
 
@@ -182,6 +184,7 @@ Example:
   ```bash
   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="fitnesspark-visualizer"' --limit 50
   ```
+* To verify visual changes after redeployment, simply refresh the dashboard — Cloud Run hot-swaps the new revision automatically.
 
 ---
 
@@ -190,7 +193,7 @@ Example:
 Your visualizer is a secure, auto-updating, zero-maintenance dashboard that:
 
 * Fetches live data from Cloud Storage
-* Visualizes trends and patterns
+* Visualizes trends and weekday patterns
 * Focuses on open hours for clear insights
-* Protects against spam
+* Protects against spam and unnecessary costs
 * Runs fully serverless on Google Cloud Run
