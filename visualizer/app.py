@@ -254,7 +254,7 @@ def create_weekly_pattern_chart(weekly_profiles):
         title="Weekly Attendance Patterns",
     )
     fig.update_layout(template="plotly_white", xaxis_type="category")
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return to_plain_json(fig)
 
 def create_summary_table(summary, peaks):
     summary_pivot = (
