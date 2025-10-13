@@ -1,6 +1,7 @@
 import logging
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from google.cloud import storage
 import tempfile
 import os
@@ -23,7 +24,7 @@ class CloudStorageLogger:
 
     def upload(self, count: int, status: str) -> None:
         """Append a new record to the JSONL file in Cloud Storage."""
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(ZoneInfo("Europe/Zurich")).isoformat()
         record = {"timestamp": timestamp, "count": count, "status": status}
 
         try:
