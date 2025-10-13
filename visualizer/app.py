@@ -157,7 +157,7 @@ def create_summary_table(summary, peaks):
     summary_pivot = summary.pivot(index='weekday_name', columns='time_slot', values='count').round(0).fillna(0).astype(int)
     summary_pivot = summary_pivot.reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
     
-    peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%Y-%m-%d %H:%M')
+    peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%d.%m. %H:%M')
     
     summary_pivot.reset_index(inplace=True)
     summary_pivot = summary_pivot.merge(peaks[['weekday_name', 'peak_count', 'peak_time_str']], on='weekday_name', how='left')
