@@ -18,9 +18,6 @@ logger = logging.getLogger("FitnessparkVisualizer")
 # In-memory rate limiter
 last_access = {}
 
-# In-memory cache for processed data
-cache = {}
-CACHE_TTL_SECONDS = 300  # 5 minutes
 
 BUCKET_NAME = "fitnesspark-attendance-data"
 BLOB_PATH = "attendance/attendance_data.jsonl"
@@ -183,39 +180,30 @@ def create_all_time_chart(df):
 @app.route("/")
 def index():
     try:
-        now = time()
-        # Check if cache is valid
-        if "data" in cache and now - cache.get("timestamp", 0) < CACHE_TTL_SECONDS:
-            logger.info("Serving from cache.")
-            cached_data = cache["data"]
-        else:
-            logger.info("Cache miss or expired. Reloading data from GCS.")
-            df = load_data_from_gcs()
+        logger.info("Loading data from GCS.")
+        df = load_data_from_gcs()
 
-            today_data, avg_data = compute_today_vs_typical(df.copy())
-            summary, peaks = compute_weekly_summary(df.copy())
-            weekly_profiles = compute_weekly_profiles(df.copy())
+        today_data, avg_data = compute_today_vs_typical(df.copy())
+        summary, peaks = compute_weekly_summary(df.copy())
+        weekly_profiles = compute_weekly_profiles(df.copy())
 
-            chart1_json = create_today_vs_typical_chart(today_data, avg_data)
-            chart2_json = create_weekly_pattern_chart(weekly_profiles)
-            table_json = create_summary_table(summary, peaks)
-            chart3_json = create_all_time_chart(df.copy())
+        chart1_json = create_today_vs_typical_chart(today_data, avg_data)
+        chart2_json = create_weekly_pattern_chart(weekly_profiles)
+        table_json = create_summary_table(summary, peaks)
+        chart3_json = create_all_time_chart(df.copy())
 
-            cached_data = {
-                "chart1_json": chart1_json,
-                "chart2_json": chart2_json,
-                "table_json": table_json,
-                "chart3_json": chart3_json,
-            }
-            # Update cache
-            cache["data"] = cached_data
-            cache["timestamp"] = now
+        data = {
+            "chart1_json": chart1_json,
+            "chart2_json": chart2_json,
+            "table_json": table_json,
+            "chart3_json": chart3_json,
+        }
 
     except Exception as e:
         logger.error(f"Failed to load data: {e}", exc_info=True)
         return "Error loading data", 500
 
-    return render_template("index.html", **cached_data)
+    return render_template("index.html", **data)
 
 
 if __name__ == "__main__":
