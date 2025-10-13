@@ -147,9 +147,10 @@ def index():
             df = load_data_from_gcs()
 
             # Process all data and store in a dictionary
+            today_data, avg_data = compute_today_vs_typical(df.copy())
             cached_data = {
-                "today": compute_today_vs_typical(df.copy())[0],
-                "average": compute_today_vs_typical(df.copy())[1],
+                "today": today_data,
+                "average": avg_data,
                 "history": df.to_dict(orient="records"),
                 "summary": compute_weekly_summary(df.copy())[0].to_dict(orient="records"),
                 "peaks": compute_weekly_summary(df.copy())[1].to_dict(orient="records"),
