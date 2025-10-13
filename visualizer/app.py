@@ -47,14 +47,14 @@ def load_data_from_gcs():
 
 
 def compute_today_vs_typical(df):
-    now = datetime.now()
+    now = pd.Timestamp.now('UTC')
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday"] = df["timestamp"].dt.strftime("%A")
 
     today_weekday_name = now.strftime("%A")
     df_today = df[df["weekday"] == today_weekday_name]
 
-    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10min")
+    four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df_recent = df[df["timestamp"] >= four_weeks_ago]
 
     df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
@@ -73,8 +73,8 @@ def compute_today_vs_typical(df):
 
 
 def compute_weekly_summary(df):
-    now = datetime.now()
-    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10min")
+    now = pd.Timestamp.now('UTC')
+    four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
     df["weekday_name"] = df["timestamp"].dt.strftime("%A")

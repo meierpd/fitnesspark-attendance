@@ -191,3 +191,35 @@ def test_index_route(mock_load_data, client):
     
     assert response.status_code == 200
     assert b'Fitnesspark Attendance Dashboard' in response.data
+
+# 6. Test peak time flooring
+
+def test_peak_time_flooring():
+    """
+    Tests that the peak timestamp from compute_weekly_summary is correctly
+    reflecting the 10-minute flooring from the input data.
+    """
+    # This timestamp, when floored to 10 mins, should become 18:00
+    peak_time_unfloored = '2025-10-13 18:08:00'
+    peak_time_floored = '2025-10-13 18:00:00'
+
+    data = {
+        'timestamp': pd.to_datetime([
+            peak_time_unfloored,
+            '2025-10-13 19:10:00', # another data point
+        ]),
+        'count': [100, 50]
+    }
+    df = pd.DataFrame(data)
+
+    # In the actual app, load_data_from_gcs floors the timestamps.
+    # We simulate this by flooring the timestamp before passing to the function.
+    df['timestamp'] = df['timestamp'].dt.floor('10min')
+
+    with patch('app.datetime') as mock_datetime:
+        mock_datetime.now.return_value = datetime(2025, 10, 14)
+        _, peaks = compute_weekly_summary(df.copy())
+
+    assert not peaks.empty
+    peak = peaks.iloc[0]
+    assert peak['peak_time'] == pd.to_datetime(peak_time_floored)
