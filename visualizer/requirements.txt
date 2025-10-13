@@ -2,3 +2,6 @@ Flask
 pandas
 google-cloud-storage
 gunicorn
+plotly
+pytest
+pytest-mock

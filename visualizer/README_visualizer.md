@@ -1,13 +1,12 @@
 # 🏠 Fitnesspark Attendance Visualizer
 
-This visualizer is a Flask-based dashboard that reads gym attendance data from **Google Cloud Storage**, processes it in real time, and displays it interactively using **Chart.js**.
+This visualizer is a Flask-based dashboard that reads gym attendance data from **Google Cloud Storage**, processes it in real time, and displays it interactively using **Plotly**.
 
 It provides:
 
 * 🔢 **Today vs Typical (Same Weekday)** comparison chart (focused on open hours 06:30–22:00)
-* ⏱️ **All-Time Attendance** trend
 * 📈 **Weekly Attendance Patterns** — multi-line chart showing each weekday’s average attendance profile over time (last 4 weeks)
-* 🗒️ **Weekly Summary Table (Last 4 Weeks)** including average visitors per half-hour and daily peak counts
+* 🗒️ **Weekly Summary Table (Last 4 Weeks)** including average visitors per hour and daily peak counts
 * ⛔ **Built-in rate limiter** to protect against excessive refreshes or abuse
 
 ---
@@ -20,7 +19,7 @@ visualizer/
 ├── requirements.txt        # Dependencies
 ├── Dockerfile              # Container definition
 └── templates/
-    └── index.html          # HTML + Chart.js dashboard (includes 3 charts + table)
+    └── index.html          # HTML + Plotly dashboard (includes 2 charts + table)
 ```
 
 ---
@@ -155,17 +154,16 @@ gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.serv
 ### Charts
 
 1. **Today vs Typical (Same Weekday)** – compares today’s attendance with the average of the past 4 weeks for the same weekday, limited to gym opening hours (06:30–22:00).
-2. **All-Time Attendance** – shows attendance counts over time.
-3. **Weekly Attendance Patterns** – multi-line chart comparing the average visitor trends across weekdays (each line represents one weekday’s average attendance profile over the past 4 weeks).
+2. **Weekly Attendance Patterns** – multi-line chart comparing the average visitor trends across weekdays (each line represents one weekday’s average attendance profile over the past 4 weeks).
 
 ### Summary Table
 
-* Shows **average visitor counts** per half-hour slot for each weekday (last 4 weeks)
+* Shows **average visitor counts** per hour slot for each weekday (last 4 weeks)
 * Displays **daily peak** visitor count and the **time of that peak**
 
 Example:
 
-| Day | 06:30–07:00 | 07:00–08:00 | … | 21:00–22:00 | Peak | Time  |
+| Day | 06:00–07:00 | 07:00–08:00 | … | 21:00–22:00 | Peak | Peak Time  |
 | --- | ----------- | ----------- | - | ----------- | ---- | ----- |
 | Mon | 35          | 58          | … | 44          | 120  | 18:10 |
 | Tue | 40          | 65          | … | 47          | 135  | 18:30 |

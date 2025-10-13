@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏋️‍♂️ Fitnesspark Attendance Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>ðï¸ Fitnesspark Attendance Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -22,15 +22,11 @@
         .chart-container {
             width: 100%;
             max-width: 1000px;
-            margin: 0 auto;
+            margin: 20px auto;
             background: white;
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        canvas {
-            width: 100% !important;
-            height: 400px !important;
         }
         .footer {
             text-align: center;
@@ -38,212 +34,38 @@
             color: #888;
             font-size: 0.9em;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9em;
-        }
-        th, td {
-            border: 1px solid #eee;
-            padding: 6px 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f8f8f8;
-        }
-        tr:nth-child(even) {
-            background-color: #fafafa;
-        }
     </style>
 </head>
 <body>
-    <h1>🏋️‍♂️ Fitnesspark Attendance Dashboard</h1>
+    <h1>ðï¸ Fitnesspark Attendance Dashboard</h1>
 
     <!-- Chart 1 -->
     <div class="chart-container">
-        <h2>Today vs Typical (Same Weekday, Last 4 Weeks)</h2>
-        <canvas id="todayChart"></canvas>
+        <div id="chart1"></div>
     </div>
 
     <!-- Chart 2 -->
     <div class="chart-container">
-        <h2>All-Time Attendance</h2>
-        <canvas id="historyChart"></canvas>
-    </div>
-
-    <!-- Chart 3 -->
-    <div class="chart-container">
-        <h2>Weekly Attendance Patterns (Averages over Last 4 Weeks)</h2>
-        <canvas id="weeklyChart"></canvas>
+        <div id="chart2"></div>
     </div>
 
     <!-- Table -->
     <div class="chart-container">
-      <h2>📅 Weekly Summary (Last 4 Weeks)</h2>
-      <table id="summaryTable">
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>06:30–07:00</th>
-            <th>07:00–08:00</th>
-            <th>08:00–09:00</th>
-            <th>09:00–10:00</th>
-            <th>10:00–11:00</th>
-            <th>11:00–12:00</th>
-            <th>12:00–13:00</th>
-            <th>13:00–14:00</th>
-            <th>14:00–15:00</th>
-            <th>15:00–16:00</th>
-            <th>16:00–17:00</th>
-            <th>17:00–18:00</th>
-            <th>18:00–19:00</th>
-            <th>19:00–20:00</th>
-            <th>20:00–21:00</th>
-            <th>21:00–22:00</th>
-            <th>Peak</th>
-            <th>Peak Timestamp</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div id="table"></div>
     </div>
 
     <div class="footer">
-        Updated at {{ history[-1]["timestamp"] if history else "No data" }}
+        Last updated from cache. Refresh for new data.
     </div>
 
     <script>
-        // Data from Flask
-        const dataToday = {{ today | tojson }};
-        const dataAverage = {{ average | tojson }};
-        const dataHistory = {{ history | tojson }};
-        const summaryData = {{ summary | tojson }};
-        const peaksData = {{ peaks | tojson }};
-        const weeklyProfiles = {{ weekly_profiles | tojson }};
+        const chart1_json = {{ chart1_json | tojson }};
+        const chart2_json = {{ chart2_json | tojson }};
+        const table_json = {{ table_json | tojson }};
 
-        // --- Chart 1: Today vs Typical ---
-        const ctx1 = document.getElementById('todayChart').getContext('2d');
-        new Chart(ctx1, {
-            type: 'line',
-            data: {
-                labels: dataAverage.map(d => d.time),
-                datasets: [
-                    {
-                        label: 'Typical ' + new Date().toLocaleDateString('en-GB', { weekday: 'long' }),
-                        data: dataAverage.map(d => d.count),
-                        borderColor: '#999',
-                        backgroundColor: 'rgba(160,160,160,0.15)',
-                        tension: 0.3,
-                        fill: true,
-                    },
-                    {
-                        label: 'Today',
-                        data: dataToday.map(d => d.count),
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0,123,255,0.1)',
-                        tension: 0.3,
-                        fill: true,
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    x: { title: { display: true, text: 'Time of Day' } },
-                    y: { title: { display: true, text: 'Visitors' }, beginAtZero: true }
-                },
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-
-        // --- Chart 2: All-Time Attendance ---
-        const ctx2 = document.getElementById('historyChart').getContext('2d');
-        new Chart(ctx2, {
-            type: 'line',
-            data: {
-                labels: dataHistory.map(d => d.timestamp),
-                datasets: [{
-                    label: 'Attendance Over Time',
-                    data: dataHistory.map(d => d.count),
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40,167,69,0.1)',
-                    tension: 0.3,
-                    fill: true
-                }]
-            },
-            options: {
-                scales: {
-                    x: { title: { display: true, text: 'Timestamp' } },
-                    y: { title: { display: true, text: 'Visitors' }, beginAtZero: true }
-                },
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-
-        // --- Chart 3: Weekly Attendance Patterns ---
-        const grouped = {};
-        weeklyProfiles.forEach(row => {
-            if (!grouped[row.weekday]) grouped[row.weekday] = { times: [], values: [] };
-            grouped[row.weekday].times.push(row.time);
-            grouped[row.weekday].values.push(row.visitors);
-        });
-
-        const colors = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1'];
-        const ctx3 = document.getElementById('weeklyChart').getContext('2d');
-        new Chart(ctx3, {
-            type: 'line',
-            data: {
-                labels: grouped['Monday'] ? grouped['Monday'].times : [],
-                datasets: Object.keys(grouped).map((day, i) => ({
-                    label: day,
-                    data: grouped[day].values,
-                    borderColor: colors[i % colors.length],
-                    backgroundColor: colors[i % colors.length] + '33',
-                    fill: false,
-                    tension: 0.3
-                }))
-            },
-            options: {
-                plugins: { legend: { position: 'bottom' } },
-                scales: {
-                    x: { title: { display: true, text: 'Time of Day' } },
-                    y: { title: { display: true, text: 'Average Visitors' }, beginAtZero: true }
-                }
-            }
-        });
-
-        // --- Table: Weekly Summary ---
-        const weekdays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-        const times = ["06:30","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00"];
-        const tbody = document.querySelector("#summaryTable tbody");
-
-        weekdays.forEach(day => {
-            const row = document.createElement("tr");
-            const cellDay = document.createElement("td");
-            cellDay.textContent = day;
-            row.appendChild(cellDay);
-
-            times.forEach((t, i) => {
-                const next = times[i+1] || "22:00";
-                const val = summaryData.find(d => d.weekday_name === day && d.time_slot === t);
-                const cell = document.createElement("td");
-                cell.textContent = val ? Math.round(val.count) : "-";
-                row.appendChild(cell);
-            });
-
-            const peak = peaksData.find(p => p.weekday_name === day);
-            const cellPeak = document.createElement("td");
-            cellPeak.textContent = peak ? Math.round(peak.peak_count) : "-";
-            const cellTime = document.createElement("td");
-            cellTime.textContent = peak ? new Date(peak.peak_time).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}) : "-";
-            row.appendChild(cellPeak);
-            row.appendChild(cellTime);
-
-            tbody.appendChild(row);
-        });
+        Plotly.newPlot('chart1', JSON.parse(chart1_json).data, JSON.parse(chart1_json).layout);
+        Plotly.newPlot('chart2', JSON.parse(chart2_json).data, JSON.parse(chart2_json).layout);
+        Plotly.newPlot('table', JSON.parse(table_json).data, JSON.parse(table_json).layout);
     </script>
 </body>
 </html>
