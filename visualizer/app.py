@@ -41,19 +41,20 @@ def load_data_from_gcs():
     data_bytes = blob.download_as_bytes()
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
     df.dropna(subset=["timestamp", "count"], inplace=True)
-    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("10T")
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("10min")
     df.sort_values("timestamp", inplace=True)
     return df
 
 
 def compute_today_vs_typical(df):
+    now = datetime.now()
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday"] = df["timestamp"].dt.strftime("%A")
 
-    today = datetime.now().strftime("%A")
-    df_today = df[df["weekday"] == today]
+    today_weekday_name = now.strftime("%A")
+    df_today = df[df["weekday"] == today_weekday_name]
 
-    four_weeks_ago = pd.to_datetime(datetime.now() - timedelta(weeks=4)).floor("10T")
+    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10min")
     df_recent = df[df["timestamp"] >= four_weeks_ago]
 
     df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
@@ -62,10 +63,10 @@ def compute_today_vs_typical(df):
     df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
     df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
 
-    data_today = df_today[df_today["timestamp"].dt.date == datetime.now().date()][
+    data_today = df_today[df_today["timestamp"].dt.date == now.date()][
         ["time", "count"]
     ].to_dict(orient="records")
-    data_avg = df_avg[df_avg["weekday"] == today][["time", "count"]].to_dict(
+    data_avg = df_avg[df_avg["weekday"] == today_weekday_name][["time", "count"]].to_dict(
         orient="records"
     )
     return data_today, data_avg
@@ -73,18 +74,18 @@ def compute_today_vs_typical(df):
 
 def compute_weekly_summary(df):
     now = datetime.now()
-    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10T")
+    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10min")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
     df["weekday_name"] = df["timestamp"].dt.strftime("%A")
 
     # Define time buckets for the weekly summary table
     time_bins_minutes = [
-        390, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080,
+        360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080,
         1140, 1200, 1260, 1320,
-    ]  # 06:30 to 22:00
+    ]  # 06:00 to 22:00
     labels = [
-        "06:30", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
+        "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
         "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
         "20:00", "21:00",
     ]
@@ -95,11 +96,11 @@ def compute_weekly_summary(df):
     )
     df.dropna(subset=["time_slot"], inplace=True)
 
-    pivot = df.groupby(["weekday_name", "time_slot"])["count"].mean().reset_index()
+    pivot = df.groupby(["weekday_name", "time_slot"], observed=False)["count"].mean().reset_index()
 
     peaks = (
         df.groupby("weekday_name")
-        .apply(lambda x: x.loc[x["count"].idxmax()][["timestamp", "count"]])
+        .apply(lambda x: x.loc[x["count"].idxmax()][["timestamp", "count"]], include_groups=False)
         .reset_index()
     )
     peaks.rename(
