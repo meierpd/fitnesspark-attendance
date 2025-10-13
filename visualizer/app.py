@@ -8,22 +8,19 @@ import logging
 
 app = Flask(__name__)
 
-BUCKET_NAME = "fitnesspark-attendance-data"
-FILE_PATH = "attendance/attendance_data.jsonl"
-app = Flask(__name__)
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("FitnessparkVisualizer")
 
 # In-memory rate limiter
 last_access = {}
 
+BUCKET_NAME = "fitnesspark-attendance-data"
+BLOB_PATH = "attendance/attendance_data.jsonl"
+
 
 @app.before_request
 def limit_requests():
-    """
-    Simple IP-based rate limiter: allow 1 request every 2 seconds per IP.
-    """
+    """Simple IP-based rate limiter: allow 1 request every 2 seconds per IP."""
     ip = request.remote_addr
     now = time()
     if ip in last_access and now - last_access[ip] < 2:
@@ -31,50 +28,70 @@ def limit_requests():
     last_access[ip] = now
 
 
-def load_data():
+def load_data_from_gcs():
+    """Load the attendance log file from Cloud Storage into a DataFrame."""
     client = storage.Client()
     bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(FILE_PATH)
-    data = blob.download_as_text()
+    blob = bucket.blob(BLOB_PATH)
 
-    df = pd.read_json(io.StringIO(data), lines=True)
+    data_bytes = blob.download_as_bytes()
+    df = pd.read_json(io.BytesIO(data_bytes), lines=True)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df["weekday"] = df["timestamp"].dt.weekday
-    df["time"] = df["timestamp"].dt.strftime("%H:%M")
+    df.sort_values("timestamp", inplace=True)
     return df
 
 
-def compute_today_vs_average(df):
+def compute_today_vs_typical(df):
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["time"] = df["timestamp"].dt.floor("10T").dt.strftime("%H:%M")
+    df["weekday"] = df["timestamp"].dt.strftime("%A")
+
+    today = datetime.now().strftime("%A")
+    df_today = df[df["weekday"] == today]
+
+    four_weeks_ago = datetime.now() - timedelta(weeks=4)
+    df_recent = df[df["timestamp"] >= four_weeks_ago]
+
+    df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
+
+    data_today = df_today[df_today["timestamp"].dt.date == datetime.now().date()][
+        ["time", "count"]
+    ].to_dict(orient="records")
+    data_avg = df_avg[df_avg["weekday"] == today][["time", "count"]].to_dict(
+        orient="records"
+    )
+    return data_today, data_avg
+
+
+def compute_weekly_summary(df):
     now = datetime.now()
-    today_date = now.date()
-    today_weekday = now.weekday()
-
-    # Filter for same weekday in the last 4 weeks
     four_weeks_ago = now - timedelta(weeks=4)
-    df_period = df[
-        (df["timestamp"] >= four_weeks_ago) & (df["weekday"] == today_weekday)
-    ]
+    df = df[df["timestamp"] >= four_weeks_ago].copy()
 
-    # Compute average per time slot
-    df_avg = df_period.groupby("time")["count"].mean().reset_index()
+    df["time_slot"] = df["timestamp"].dt.floor("30T").dt.strftime("%H:%M")
+    df["weekday_name"] = df["timestamp"].dt.strftime("%A")
 
-    # Get today's data
-    df_today = df[df["timestamp"].dt.date == today_date].copy()
-    df_today = df_today[["time", "count"]]
-    # Filter to open hours (e.g., 06:30–22:00)
-    df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
-    df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
-    return df_today, df_avg
+    pivot = df.groupby(["weekday_name", "time_slot"])["count"].mean().reset_index()
+
+    peaks = (
+        df.groupby("weekday_name")
+        .apply(lambda x: x.loc[x["count"].idxmax()][["timestamp", "count"]])
+        .reset_index()
+    )
+    peaks.rename(
+        columns={"count": "peak_count", "timestamp": "peak_time"}, inplace=True
+    )
+
+    return pivot, peaks
 
 
 def compute_weekly_profiles(df):
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["weekday"] = df["timestamp"].dt.day_name()
-    df["time"] = df["timestamp"].dt.strftime("%H:%M")
+    df["time"] = df["timestamp"].dt.floor("10T").dt.strftime("%H:%M")
 
-    # Group by weekday and time to get average visitor counts
     df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
 
-    # Sort weekdays to ensure Monday→Sunday order
     weekday_order = [
         "Monday",
         "Tuesday",
@@ -92,55 +109,26 @@ def compute_weekly_profiles(df):
     return df_weekly
 
 
-def compute_weekly_summary(df):
-    now = datetime.now()
-    four_weeks_ago = now - timedelta(weeks=4)
-    df = df[df["timestamp"] >= four_weeks_ago].copy()
-
-    # Round timestamps to nearest 30 min
-    df["time_slot"] = df["timestamp"].dt.floor("30min").dt.strftime("%H:%M")
-    df["weekday_name"] = df["timestamp"].dt.strftime("%A")
-
-    # Compute average per weekday & time slot
-    pivot = df.groupby(["weekday_name", "time_slot"])["count"].mean().reset_index()
-
-    # Compute peak per weekday
-    peaks = (
-        df.groupby("weekday_name")
-        .apply(lambda x: x.loc[x["count"].idxmax()][["timestamp", "count"]])
-        .reset_index()
-    )
-    peaks.rename(
-        columns={"count": "peak_count", "timestamp": "peak_time"}, inplace=True
-    )
-
-    return pivot, peaks
-
-
 @app.route("/")
 def index():
-    df = load_data()
-    df_today, df_avg = compute_today_vs_average(df)
+    try:
+        df = load_data_from_gcs()
+    except Exception as e:
+        logger.error(f"Failed to load data: {e}")
+        return "Error loading data", 500
 
-    data_today = df_today.to_dict(orient="records")
-    data_avg = df_avg.to_dict(orient="records")
-    data_history = df[["timestamp", "count"]].to_dict(orient="records")
-
-    weekly_profiles = compute_weekly_profiles(df)
-    weekly_profiles_json = weekly_profiles.to_dict(orient="records")
-
+    data_today, data_avg = compute_today_vs_typical(df)
     df_summary, df_peaks = compute_weekly_summary(df)
-    summary = df_summary.to_dict(orient="records")
-    peaks = df_peaks.to_dict(orient="records")
+    df_profiles = compute_weekly_profiles(df)
 
     return render_template(
         "index.html",
         today=data_today,
         average=data_avg,
-        history=data_history,
-        summary=summary,
-        peaks=peaks,
-        weekly_profiles=weekly_profiles_json
+        history=df.to_dict(orient="records"),
+        summary=df_summary.to_dict(orient="records"),
+        peaks=df_peaks.to_dict(orient="records"),
+        weekly_profiles=df_profiles.to_dict(orient="records"),
     )
 
 
