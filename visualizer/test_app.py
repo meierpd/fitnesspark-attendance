@@ -187,3 +187,4 @@ def test_index_route_with_plotly(mock_load_data, client):
     assert b'chart1_json' in response.data
     assert b'chart2_json' in response.data
     assert b'table_json' in response.data
+    assert b'chart3_json' in response.data

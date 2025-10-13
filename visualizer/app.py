@@ -170,6 +170,11 @@ def create_summary_table(summary, peaks):
     fig.update_layout(title_text="Weekly Summary and Peak Times")
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
+def create_all_time_chart(df):
+    fig = px.line(df, x='timestamp', y='count', title='All-Time Attendance')
+    fig.update_layout(template="plotly_white")
+    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
 
 @app.route("/")
 def index():
@@ -190,11 +195,13 @@ def index():
             chart1_json = create_today_vs_typical_chart(today_data, avg_data)
             chart2_json = create_weekly_pattern_chart(weekly_profiles)
             table_json = create_summary_table(summary, peaks)
+            chart3_json = create_all_time_chart(df.copy())
 
             cached_data = {
                 "chart1_json": chart1_json,
                 "chart2_json": chart2_json,
                 "table_json": table_json,
+                "chart3_json": chart3_json,
             }
             # Update cache
             cache["data"] = cached_data

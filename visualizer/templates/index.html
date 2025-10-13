@@ -54,6 +54,11 @@
       <div id="table"></div>
     </div>
 
+    <!-- Chart 3 -->
+    <div class="chart-container">
+        <div id="chart3"></div>
+    </div>
+
     <div class="footer">
         Last updated from cache. Refresh for new data.
     </div>
@@ -62,10 +67,12 @@
         const chart1_json = {{ chart1_json | tojson }};
         const chart2_json = {{ chart2_json | tojson }};
         const table_json = {{ table_json | tojson }};
+        const chart3_json = {{ chart3_json | tojson }};
 
         Plotly.newPlot('chart1', JSON.parse(chart1_json).data, JSON.parse(chart1_json).layout);
         Plotly.newPlot('chart2', JSON.parse(chart2_json).data, JSON.parse(chart2_json).layout);
         Plotly.newPlot('table', JSON.parse(table_json).data, JSON.parse(table_json).layout);
+        Plotly.newPlot('chart3', JSON.parse(chart3_json).data, JSON.parse(chart3_json).layout);
     </script>
 </body>
 </html>
