@@ -53,15 +53,16 @@ def compute_today_vs_typical(df):
 
     df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
 
+    # Filter for opening hours before converting to dict
+    df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
+    df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
+
     data_today = df_today[df_today["timestamp"].dt.date == datetime.now().date()][
         ["time", "count"]
     ].to_dict(orient="records")
     data_avg = df_avg[df_avg["weekday"] == today][["time", "count"]].to_dict(
         orient="records"
     )
-
-    df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
-    df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
     return data_today, data_avg
 
 
@@ -70,8 +71,24 @@ def compute_weekly_summary(df):
     four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10T")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
-    df["time_slot"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday_name"] = df["timestamp"].dt.strftime("%A")
+
+    # Define time buckets for the weekly summary table
+    time_bins_minutes = [
+        390, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080,
+        1140, 1200, 1260, 1320,
+    ]  # 06:30 to 22:00
+    labels = [
+        "06:30", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
+        "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
+        "20:00", "21:00",
+    ]
+
+    time_in_minutes = df["timestamp"].dt.hour * 60 + df["timestamp"].dt.minute
+    df["time_slot"] = pd.cut(
+        time_in_minutes, bins=time_bins_minutes, labels=labels, right=False
+    )
+    df.dropna(subset=["time_slot"], inplace=True)
 
     pivot = df.groupby(["weekday_name", "time_slot"])["count"].mean().reset_index()
 
