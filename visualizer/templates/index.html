@@ -39,6 +39,12 @@
 <body>
     <h1>🏋️‍♂️ Fitnesspark Attendance Dashboard</h1>
 
+    {% if warning_message %}
+    <div class="warning-container">
+        <strong>{{ warning_message }}</strong>
+    </div>
+    {% endif %}
+
     <!-- Chart 1 -->
     <div class="chart-container">
         <div id="chart1"></div>
@@ -60,15 +66,15 @@
     </div>
 
     <script>
-        const chart1_json = {{ chart1_json | tojson }};
-        const chart2_json = {{ chart2_json | tojson }};
-        const table_json = {{ table_json | tojson }};
-        const chart3_json = {{ chart3_json | tojson }};
+        const chart1_data = {{ chart1_json | safe }};
+        const chart2_data = {{ chart2_json | safe }};
+        const table_data = {{ table_json | safe }};
+        const chart3_data = {{ chart3_json | safe }};
 
-        Plotly.newPlot('chart1', JSON.parse(chart1_json).data, JSON.parse(chart1_json).layout);
-        Plotly.newPlot('chart2', JSON.parse(chart2_json).data, JSON.parse(chart2_json).layout);
-        Plotly.newPlot('table', JSON.parse(table_json).data, JSON.parse(table_json).layout);
-        Plotly.newPlot('chart3', JSON.parse(chart3_json).data, JSON.parse(chart3_json).layout);
+        Plotly.newPlot('chart1', chart1_data.data, chart1_data.layout);
+        Plotly.newPlot('chart2', chart2_data.data, chart2_data.layout);
+        Plotly.newPlot('table', table_data.data, table_data.layout);
+        Plotly.newPlot('chart3', chart3_data.data, chart3_data.layout);
     </script>
 </body>
 </html>

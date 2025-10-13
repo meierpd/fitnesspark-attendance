@@ -44,13 +44,13 @@ def load_data_from_gcs():
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
     df.rename(columns={"count": "attendance_count"}, inplace=True)
     df.dropna(subset=["timestamp", "attendance_count"], inplace=True)
-    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize('UTC').dt.floor("10min")
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize('Europe/Zurich').dt.floor("10min")
     df.sort_values("timestamp", inplace=True)
     return df
 
 
 def compute_today_vs_typical(df):
-    now = pd.Timestamp.now('UTC')
+    now = pd.Timestamp.now('Europe/Zurich')
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday"] = df["timestamp"].dt.strftime("%A")
 
@@ -66,14 +66,14 @@ def compute_today_vs_typical(df):
     df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
     df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
 
-    data_today = df_today[df_today["timestamp"].dt.date == now.date()]
-    data_avg = df_avg[df_avg["weekday"] == today_weekday_name]
+    data_today = df_today[df_today["timestamp"].dt.date == now.date()].sort_values("time")
+    data_avg = df_avg[df_avg["weekday"] == today_weekday_name].sort_values("time")
 
     return data_today, data_avg
 
 
 def compute_weekly_summary(df):
-    now = pd.Timestamp.now('UTC')
+    now = pd.Timestamp.now('Europe/Zurich')
     four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
@@ -190,11 +190,17 @@ def index():
         table_json = create_summary_table(summary, peaks)
         chart3_json = create_all_time_chart(df.copy())
 
+        warning_message = None
+        if today_data.empty:
+            now_date = pd.Timestamp.now('Europe/Zurich').strftime('%Y-%m-%d')
+            warning_message = f"No attendance data found for today ({now_date}). The data from the scraper might be stale or delayed."
+
         data = {
             "chart1_json": chart1_json,
             "chart2_json": chart2_json,
             "table_json": table_json,
             "chart3_json": chart3_json,
+            "warning_message": warning_message,
         }
 
     except Exception as e:
