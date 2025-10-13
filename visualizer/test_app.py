@@ -56,7 +56,7 @@ def test_load_data_from_gcs(mock_storage_client):
     assert isinstance(df, pd.DataFrame)
     assert not df.empty
     assert 'timestamp' in df.columns
-    assert 'count' in df.columns
+    assert 'attendance_count' in df.columns
     assert pd.api.types.is_datetime64_any_dtype(df['timestamp'])
     assert df['timestamp'].dt.tz is not None
     
@@ -84,7 +84,7 @@ def test_compute_today_vs_typical(mock_pd_timestamp_now):
             '2025-09-29 10:00:00',  # 2 weeks ago, Monday, count 6
             '2025-10-12 10:00:00',  # Sunday, count 15
         ]).tz_localize('UTC'),
-        'count': [10, 20, 8, 6, 15]
+        'attendance_count': [10, 20, 8, 6, 15]
     }
     df = pd.DataFrame(data)
 
@@ -98,8 +98,8 @@ def test_compute_today_vs_typical(mock_pd_timestamp_now):
     avg_10_00 = data_avg[data_avg["time"] == "10:00"]
     avg_10_10 = data_avg[data_avg["time"] == "10:10"]
     
-    assert avg_10_00['count'].iloc[0] == pytest.approx((10 + 8 + 6) / 3)
-    assert avg_10_10['count'].iloc[0] == pytest.approx(20)
+    assert avg_10_00['attendance_count'].iloc[0] == pytest.approx((10 + 8 + 6) / 3)
+    assert avg_10_10['attendance_count'].iloc[0] == pytest.approx(20)
 
 
 # 3. Test compute_weekly_summary
@@ -118,7 +118,7 @@ def test_compute_weekly_summary(mock_pd_timestamp_now):
             '2025-10-14 18:00:00',  # Tuesday, count 100 (peak)
             '2025-10-14 19:10:00',  # Tuesday, count 50
         ]).tz_localize('UTC'),
-        'count': [10, 20, 100, 50]
+        'attendance_count': [10, 20, 100, 50]
     }
     df = pd.DataFrame(data)
 
@@ -129,7 +129,7 @@ def test_compute_weekly_summary(mock_pd_timestamp_now):
     mon_summary = summary[summary['weekday_name'] == 'Monday']
     mon_summary = mon_summary.dropna()
     assert mon_summary.iloc[0]['time_slot'] == '07:00'
-    assert mon_summary.iloc[0]['count'] == 15
+    assert mon_summary.iloc[0]['attendance_count'] == 15
 
     # Test peaks
     assert not peaks.empty
@@ -152,7 +152,7 @@ def test_compute_weekly_profiles():
             '2025-10-13 10:00:00',  # Monday, count 20
             '2025-10-14 11:00:00',  # Tuesday, count 30
         ]).tz_localize('UTC'),
-        'count': [10, 20, 30]
+        'attendance_count': [10, 20, 30]
     }
     df = pd.DataFrame(data)
     
@@ -175,7 +175,7 @@ def test_index_route_with_plotly(mock_load_data, client):
     # Create a sample dataframe for the mock to return
     data = {
         'timestamp': pd.to_datetime(['2025-10-13 10:00:00', '2025-10-13 10:10:00']).tz_localize('UTC'),
-        'count': [10, 20]
+        'attendance_count': [10, 20]
     }
     sample_df = pd.DataFrame(data)
     mock_load_data.return_value = sample_df

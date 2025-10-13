@@ -33,6 +33,7 @@ def limit_requests():
     last_access[ip] = now
 
 
+
 def load_data_from_gcs():
     """Load the attendance log file from Cloud Storage into a DataFrame."""
     client = storage.Client()
@@ -41,7 +42,8 @@ def load_data_from_gcs():
 
     data_bytes = blob.download_as_bytes()
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
-    df.dropna(subset=["timestamp", "count"], inplace=True)
+    df.rename(columns={"count": "attendance_count"}, inplace=True)
+    df.dropna(subset=["timestamp", "attendance_count"], inplace=True)
     df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize('UTC').dt.floor("10min")
     df.sort_values("timestamp", inplace=True)
     return df
@@ -58,7 +60,7 @@ def compute_today_vs_typical(df):
     four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df_recent = df[df["timestamp"] >= four_weeks_ago]
 
-    df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
+    df_avg = df_recent.groupby(["weekday", "time"])["attendance_count"].mean().reset_index()
 
     # Filter for opening hours before converting to dict
     df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
@@ -66,10 +68,6 @@ def compute_today_vs_typical(df):
 
     data_today = df_today[df_today["timestamp"].dt.date == now.date()]
     data_avg = df_avg[df_avg["weekday"] == today_weekday_name]
-    
-    # Ensure data is sorted by time for correct plotting
-    data_today = data_today.sort_values('time')
-    data_avg = data_avg.sort_values('time')
 
     return data_today, data_avg
 
@@ -98,15 +96,15 @@ def compute_weekly_summary(df):
     )
     df.dropna(subset=["time_slot"], inplace=True)
 
-    pivot = df.groupby(["weekday_name", "time_slot"], observed=False)["count"].mean().reset_index()
+    pivot = df.groupby(["weekday_name", "time_slot"], observed=False)["attendance_count"].mean().reset_index()
 
     peaks = (
         df.groupby("weekday_name")
-        .apply(lambda x: x.loc[x["count"].idxmax()][["timestamp", "count"]], include_groups=False)
+        .apply(lambda x: x.loc[x["attendance_count"].idxmax()][["timestamp", "attendance_count"]], include_groups=False)
         .reset_index()
     )
     peaks.rename(
-        columns={"count": "peak_count", "timestamp": "peak_time"}, inplace=True
+        columns={"attendance_count": "peak_count", "timestamp": "peak_time"}, inplace=True
     )
 
     return pivot, peaks
@@ -116,8 +114,8 @@ def compute_weekly_profiles(df):
     df["weekday"] = df["timestamp"].dt.day_name()
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
 
-    df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
-    df_weekly.rename(columns={"count": "visitors"}, inplace=True)
+    df_weekly = df.groupby(["weekday", "time"])["attendance_count"].mean().reset_index()
+    df_weekly.rename(columns={"attendance_count": "visitors"}, inplace=True)
 
     # Filter for opening hours
     df_weekly = df_weekly[(df_weekly["time"] >= "06:30") & (df_weekly["time"] <= "22:00")]
@@ -140,8 +138,8 @@ def compute_weekly_profiles(df):
 
 def create_today_vs_typical_chart(today_data, avg_data):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=today_data['time'], y=today_data['count'], mode='lines+markers', name='Today'))
-    fig.add_trace(go.Scatter(x=avg_data['time'], y=avg_data['count'], mode='lines', name='Typical'))
+    fig.add_trace(go.Scatter(x=today_data['time'], y=today_data['attendance_count'], mode='lines+markers', name='Today'))
+    fig.add_trace(go.Scatter(x=avg_data['time'], y=avg_data['attendance_count'], mode='lines', name='Typical'))
     fig.update_layout(title_text="Today vs. Typical Attendance", template="plotly_white", xaxis_type='category')
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
@@ -151,7 +149,7 @@ def create_weekly_pattern_chart(weekly_profiles):
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 def create_summary_table(summary, peaks):
-    summary_pivot = summary.pivot(index='weekday_name', columns='time_slot', values='count').round(0).fillna(0).astype(int)
+    summary_pivot = summary.pivot(index='weekday_name', columns='time_slot', values='attendance_count').round(0).fillna(0).astype(int)
     summary_pivot = summary_pivot.reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
     
     peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%d.%m. %H:%M')
@@ -172,7 +170,7 @@ def create_summary_table(summary, peaks):
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 def create_all_time_chart(df):
-    fig = px.line(df, x='timestamp', y='count', title='All-Time Attendance')
+    fig = px.line(df, x='timestamp', y='attendance_count', title='All-Time Attendance')
     fig.update_layout(template="plotly_white")
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
