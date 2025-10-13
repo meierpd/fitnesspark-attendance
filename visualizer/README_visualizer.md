@@ -52,6 +52,7 @@ Then open [http://localhost:8080](http://localhost:8080) to view the dashboard.
 ```bash
 export PROJECT_ID=fitnesspark-attendance
 export IMAGE="europe-west6-docker.pkg.dev/${PROJECT_ID}/fitnesspark-attendance/visualizer:latest"
+gcloud config set project fitnesspark-attendance
 
 gcloud builds submit --tag $IMAGE
 ```
