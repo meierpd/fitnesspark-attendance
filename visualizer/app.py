@@ -14,6 +14,10 @@ logger = logging.getLogger("FitnessparkVisualizer")
 # In-memory rate limiter
 last_access = {}
 
+# In-memory cache for processed data
+cache = {}
+CACHE_TTL_SECONDS = 300  # 5 minutes
+
 BUCKET_NAME = "fitnesspark-attendance-data"
 BLOB_PATH = "attendance/attendance_data.jsonl"
 
@@ -36,6 +40,7 @@ def load_data_from_gcs():
 
     data_bytes = blob.download_as_bytes()
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
+    df.dropna(subset=["timestamp", "count"], inplace=True)
     df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("10T")
     df.sort_values("timestamp", inplace=True)
     return df
@@ -109,6 +114,7 @@ def compute_weekly_profiles(df):
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
 
     df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
+    df_weekly.rename(columns={"count": "visitors"}, inplace=True)
 
     weekday_order = [
         "Monday",
@@ -130,24 +136,33 @@ def compute_weekly_profiles(df):
 @app.route("/")
 def index():
     try:
-        df = load_data_from_gcs()
+        now = time()
+        # Check if cache is valid
+        if "data" in cache and now - cache.get("timestamp", 0) < CACHE_TTL_SECONDS:
+            logger.info("Serving from cache.")
+            cached_data = cache["data"]
+        else:
+            logger.info("Cache miss or expired. Reloading data from GCS.")
+            df = load_data_from_gcs()
+
+            # Process all data and store in a dictionary
+            cached_data = {
+                "today": compute_today_vs_typical(df.copy())[0],
+                "average": compute_today_vs_typical(df.copy())[1],
+                "history": df.to_dict(orient="records"),
+                "summary": compute_weekly_summary(df.copy())[0].to_dict(orient="records"),
+                "peaks": compute_weekly_summary(df.copy())[1].to_dict(orient="records"),
+                "weekly_profiles": compute_weekly_profiles(df.copy()).to_dict(orient="records"),
+            }
+            # Update cache
+            cache["data"] = cached_data
+            cache["timestamp"] = now
+
     except Exception as e:
         logger.error(f"Failed to load data: {e}")
         return "Error loading data", 500
 
-    data_today, data_avg = compute_today_vs_typical(df.copy())
-    df_summary, df_peaks = compute_weekly_summary(df.copy())
-    df_profiles = compute_weekly_profiles(df.copy())
-
-    return render_template(
-        "index.html",
-        today=data_today,
-        average=data_avg,
-        history=df.to_dict(orient="records"),
-        summary=df_summary.to_dict(orient="records"),
-        peaks=df_peaks.to_dict(orient="records"),
-        weekly_profiles=df_profiles.to_dict(orient="records"),
-    )
+    return render_template("index.html", **cached_data)
 
 
 if __name__ == "__main__":
