@@ -74,7 +74,7 @@ def test_compute_today_vs_typical(mock_pd_timestamp_now):
     Verifies that it correctly calculates 'today's data and the 'typical'
     average for the same weekday over the last 4 weeks.
     """
-    mock_pd_timestamp_now.return_value = pd.Timestamp('2025-10-13 12:00:00', tz='UTC')  # A Monday
+    mock_pd_timestamp_now.return_value = pd.Timestamp('2025-10-13 12:00:00', tz='Europe/Zurich')  # A Monday
 
     data = {
         'timestamp': pd.to_datetime([
@@ -83,7 +83,7 @@ def test_compute_today_vs_typical(mock_pd_timestamp_now):
             '2025-10-06 10:00:00',  # Last week, Monday, count 8
             '2025-09-29 10:00:00',  # 2 weeks ago, Monday, count 6
             '2025-10-12 10:00:00',  # Sunday, count 15
-        ]).tz_localize('UTC'),
+        ]).tz_localize('Europe/Zurich'),
         'attendance_count': [10, 20, 8, 6, 15]
     }
     df = pd.DataFrame(data)
@@ -110,14 +110,14 @@ def test_compute_weekly_summary(mock_pd_timestamp_now):
     Verifies that it correctly computes the average attendance for defined
     time buckets and finds the peak attendance for each weekday.
     """
-    mock_pd_timestamp_now.return_value = pd.Timestamp('2025-10-15 12:00:00', tz='UTC') # A Wednesday
+    mock_pd_timestamp_now.return_value = pd.Timestamp('2025-10-15 12:00:00', tz='Europe/Zurich') # A Wednesday
     data = {
         'timestamp': pd.to_datetime([
             '2025-10-13 07:30:00',  # Monday, count 10
             '2025-10-13 07:40:00',  # Monday, count 20
             '2025-10-14 18:00:00',  # Tuesday, count 100 (peak)
             '2025-10-14 19:10:00',  # Tuesday, count 50
-        ]).tz_localize('UTC'),
+        ]).tz_localize('Europe/Zurich'),
         'attendance_count': [10, 20, 100, 50]
     }
     df = pd.DataFrame(data)
@@ -136,7 +136,7 @@ def test_compute_weekly_summary(mock_pd_timestamp_now):
     assert len(peaks) == 2  # One peak for Monday, one for Tuesday
     tue_peak = peaks[peaks['weekday_name'] == 'Tuesday'].iloc[0]
     assert tue_peak['peak_count'] == 100
-    assert tue_peak['peak_time'] == pd.to_datetime('2025-10-14 18:00:00').tz_localize('UTC')
+    assert tue_peak['peak_time'] == pd.to_datetime('2025-10-14 18:00:00').tz_localize('Europe/Zurich')
 
 
 # 4. Test compute_weekly_profiles
@@ -151,7 +151,7 @@ def test_compute_weekly_profiles():
             '2025-10-13 10:00:00',  # Monday, count 10
             '2025-10-13 10:00:00',  # Monday, count 20
             '2025-10-14 11:00:00',  # Tuesday, count 30
-        ]).tz_localize('UTC'),
+        ]).tz_localize('Europe/Zurich'),
         'attendance_count': [10, 20, 30]
     }
     df = pd.DataFrame(data)
@@ -166,15 +166,17 @@ def test_compute_weekly_profiles():
     assert mon_profile.iloc[0]['visitors'] == 15  # (10+20)/2
 
 # 5. Test Flask route with Plotly charts
+@patch('app.pd.Timestamp.now')
 @patch('app.load_data_from_gcs')
-def test_index_route_with_plotly(mock_load_data, client):
+def test_index_route_with_plotly(mock_load_data, mock_pd_timestamp_now, client):
     """
     Tests the main Flask route '/' with Plotly charts.
     Mocks the data loading function and checks for Plotly JSON in the response.
     """
+    mock_pd_timestamp_now.return_value = pd.Timestamp('2025-10-13 12:00:00', tz='Europe/Zurich')
     # Create a sample dataframe for the mock to return
     data = {
-        'timestamp': pd.to_datetime(['2025-10-13 10:00:00', '2025-10-13 10:10:00']).tz_localize('UTC'),
+        'timestamp': pd.to_datetime(['2025-10-13 10:00:00', '2025-10-13 10:10:00']).tz_localize('Europe/Zurich'),
         'attendance_count': [10, 20]
     }
     sample_df = pd.DataFrame(data)
@@ -184,7 +186,7 @@ def test_index_route_with_plotly(mock_load_data, client):
     
     assert response.status_code == 200
     assert b'Fitnesspark Attendance Dashboard' in response.data
-    assert b'chart1_json' in response.data
-    assert b'chart2_json' in response.data
-    assert b'table_json' in response.data
-    assert b'chart3_json' in response.data
+    assert b'Today vs. Typical Attendance' in response.data
+    assert b'Weekly Attendance Patterns' in response.data
+    assert b'Weekly Summary and Peak Times' in response.data
+    assert b'All-Time Attendance' in response.data
