@@ -70,6 +70,10 @@ def compute_today_vs_typical(df):
     data_today = df_today[df_today["timestamp"].dt.date == now.date()]
     data_avg = df_avg[df_avg["weekday"] == today_weekday_name]
     
+    # Ensure data is sorted by time for correct plotting
+    data_today = data_today.sort_values('time')
+    data_avg = data_avg.sort_values('time')
+
     return data_today, data_avg
 
 
