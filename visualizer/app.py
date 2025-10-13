@@ -145,19 +145,19 @@ def create_today_vs_typical_chart(today_data, avg_data):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=today_data['time'], y=today_data['count'], mode='lines+markers', name='Today'))
     fig.add_trace(go.Scatter(x=avg_data['time'], y=avg_data['count'], mode='lines', name='Typical'))
-    fig.update_layout(title_text="Today vs. Typical Attendance", template="plotly_white")
+    fig.update_layout(title_text="Today vs. Typical Attendance", template="plotly_white", xaxis_type='category')
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 def create_weekly_pattern_chart(weekly_profiles):
     fig = px.line(weekly_profiles, x="time", y="visitors", color='weekday', title="Weekly Attendance Patterns")
-    fig.update_layout(template="plotly_white")
+    fig.update_layout(template="plotly_white", xaxis_type='category')
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 def create_summary_table(summary, peaks):
     summary_pivot = summary.pivot(index='weekday_name', columns='time_slot', values='count').round(0).fillna(0).astype(int)
     summary_pivot = summary_pivot.reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
     
-    peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%H:%M')
+    peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%Y-%m-%d %H:%M')
     
     summary_pivot.reset_index(inplace=True)
     summary_pivot = summary_pivot.merge(peaks[['weekday_name', 'peak_count', 'peak_time_str']], on='weekday_name', how='left')
@@ -168,8 +168,8 @@ def create_summary_table(summary, peaks):
     cell_values = [summary_pivot.index] + [summary_pivot[col] for col in summary_pivot.columns]
 
     fig = go.Figure(data=[go.Table(
-        header=dict(values=header_values, fill_color='paleturquoise', align='left'),
-        cells=dict(values=cell_values, fill_color='lavender', align='left'))
+        header=dict(values=header_values, fill_color='#119DFF', font=dict(color='white', size=12), align='left'),
+        cells=dict(values=cell_values, fill_color='#F0F8FF', align='left'))
     ])
     fig.update_layout(title_text="Weekly Summary and Peak Times")
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
