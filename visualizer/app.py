@@ -33,7 +33,6 @@ def limit_requests():
     last_access[ip] = now
 
 
-
 def load_data_from_gcs():
     """Load the attendance log file from Cloud Storage into a DataFrame."""
     client = storage.Client()
@@ -43,14 +42,16 @@ def load_data_from_gcs():
     data_bytes = blob.download_as_bytes()
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
     df.rename(columns={"count": "attendance_count"}, inplace=True)
+    df["attendance_count"] = pd.to_numeric(df["attendance_count"], errors="coerce")
     df.dropna(subset=["timestamp", "attendance_count"], inplace=True)
-    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize('Europe/Zurich').dt.floor("10min")
+    df["timestamp"] = pd.to_datetime(df["timestamp"], format="mixed", utc=True)
+    df["timestamp"] = df["timestamp"].dt.tz_convert("Europe/Zurich").dt.floor("10min")
     df.sort_values("timestamp", inplace=True)
     return df
 
 
 def compute_today_vs_typical(df):
-    now = pd.Timestamp.now('Europe/Zurich')
+    now = pd.Timestamp.now("Europe/Zurich")
     df["time"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday"] = df["timestamp"].dt.strftime("%A")
 
@@ -60,20 +61,24 @@ def compute_today_vs_typical(df):
     four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df_recent = df[df["timestamp"] >= four_weeks_ago]
 
-    df_avg = df_recent.groupby(["weekday", "time"])["attendance_count"].mean().reset_index()
+    df_avg = (
+        df_recent.groupby(["weekday", "time"])["attendance_count"].mean().reset_index()
+    )
 
     # Filter for opening hours before converting to dict
     df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
     df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
 
-    data_today = df_today[df_today["timestamp"].dt.date == now.date()].sort_values("time")
+    data_today = df_today[df_today["timestamp"].dt.date == now.date()].sort_values(
+        "time"
+    )
     data_avg = df_avg[df_avg["weekday"] == today_weekday_name].sort_values("time")
 
     return data_today, data_avg
 
 
 def compute_weekly_summary(df):
-    now = pd.Timestamp.now('Europe/Zurich')
+    now = pd.Timestamp.now("Europe/Zurich")
     four_weeks_ago = (now - timedelta(weeks=4)).floor("10min")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
@@ -81,13 +86,41 @@ def compute_weekly_summary(df):
 
     # Define time buckets for the weekly summary table
     time_bins_minutes = [
-        360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080,
-        1140, 1200, 1260, 1320,
+        360,
+        420,
+        480,
+        540,
+        600,
+        660,
+        720,
+        780,
+        840,
+        900,
+        960,
+        1020,
+        1080,
+        1140,
+        1200,
+        1260,
+        1320,
     ]  # 06:00 to 22:00
     labels = [
-        "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
-        "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
-        "20:00", "21:00",
+        "06:00",
+        "07:00",
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "12:00",
+        "13:00",
+        "14:00",
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+        "19:00",
+        "20:00",
+        "21:00",
     ]
 
     time_in_minutes = df["timestamp"].dt.hour * 60 + df["timestamp"].dt.minute
@@ -96,15 +129,25 @@ def compute_weekly_summary(df):
     )
     df.dropna(subset=["time_slot"], inplace=True)
 
-    pivot = df.groupby(["weekday_name", "time_slot"], observed=False)["attendance_count"].mean().reset_index()
+    pivot = (
+        df.groupby(["weekday_name", "time_slot"], observed=False)["attendance_count"]
+        .mean()
+        .reset_index()
+    )
 
     peaks = (
         df.groupby("weekday_name")
-        .apply(lambda x: x.loc[x["attendance_count"].idxmax()][["timestamp", "attendance_count"]], include_groups=False)
+        .apply(
+            lambda x: x.loc[x["attendance_count"].idxmax()][
+                ["timestamp", "attendance_count"]
+            ],
+            include_groups=False,
+        )
         .reset_index()
     )
     peaks.rename(
-        columns={"attendance_count": "peak_count", "timestamp": "peak_time"}, inplace=True
+        columns={"attendance_count": "peak_count", "timestamp": "peak_time"},
+        inplace=True,
     )
 
     return pivot, peaks
@@ -118,7 +161,9 @@ def compute_weekly_profiles(df):
     df_weekly.rename(columns={"attendance_count": "visitors"}, inplace=True)
 
     # Filter for opening hours
-    df_weekly = df_weekly[(df_weekly["time"] >= "06:30") & (df_weekly["time"] <= "22:00")]
+    df_weekly = df_weekly[
+        (df_weekly["time"] >= "06:30") & (df_weekly["time"] <= "22:00")
+    ]
 
     weekday_order = [
         "Monday",
@@ -136,43 +181,133 @@ def compute_weekly_profiles(df):
 
     return df_weekly
 
+
+def to_plain_json(fig):
+    """
+    Convert a Plotly Figure into plain JSON (no binary bdata),
+    handling numpy, pandas, and Plotly sub-objects like Marker/Line.
+    """
+    import json
+    import numpy as np
+    import plotly.utils
+
+    def _make_safe(v):
+        # --- Recursively clean any object types ---
+        if isinstance(v, dict):
+            return {k: _make_safe(x) for k, x in v.items()}
+        elif isinstance(v, list):
+            return [_make_safe(x) for x in v]
+        elif isinstance(v, (np.integer,)):
+            return int(v)
+        elif isinstance(v, (np.floating,)):
+            return float(v)
+        elif isinstance(v, (np.ndarray,)):
+            return v.tolist()
+        # convert Plotly sub-objects (Marker, Line, Layout, etc.) to dict
+        elif hasattr(v, "to_plotly_json"):
+            return _make_safe(v.to_plotly_json())
+        return v
+
+    # --- Clean traces manually before dumping ---
+    data = []
+    for trace in fig.data:
+        trace_dict = trace.to_plotly_json()
+        data.append(_make_safe(trace_dict))
+
+    layout = _make_safe(fig.layout.to_plotly_json())
+    plain_dict = {"data": data, "layout": layout}
+
+    return plain_dict
+
 def create_today_vs_typical_chart(today_data, avg_data):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=today_data['time'], y=today_data['attendance_count'], mode='lines+markers', name='Today'))
-    fig.add_trace(go.Scatter(x=avg_data['time'], y=avg_data['attendance_count'], mode='lines', name='Typical'))
-    fig.update_layout(title_text="Today vs. Typical Attendance", template="plotly_white", xaxis_type='category')
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    fig.add_trace(
+        go.Scatter(
+            x=today_data["time"],
+            y=today_data["attendance_count"],
+            mode="lines+markers",
+            name="Today",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=avg_data["time"],
+            y=avg_data["attendance_count"],
+            mode="lines",
+            name="Typical",
+        )
+    )
+    fig.update_layout(
+        title_text="Today vs. Typical Attendance",
+        template="plotly_white",
+        xaxis_type="category",
+    )
+    return to_plain_json(fig)
+
 
 def create_weekly_pattern_chart(weekly_profiles):
-    fig = px.line(weekly_profiles, x="time", y="visitors", color='weekday', title="Weekly Attendance Patterns")
-    fig.update_layout(template="plotly_white", xaxis_type='category')
+    fig = px.line(
+        weekly_profiles,
+        x="time",
+        y="visitors",
+        color="weekday",
+        title="Weekly Attendance Patterns",
+    )
+    fig.update_layout(template="plotly_white", xaxis_type="category")
     return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
 
 def create_summary_table(summary, peaks):
-    summary_pivot = summary.pivot(index='weekday_name', columns='time_slot', values='attendance_count').round(0).fillna(0).astype(int)
-    summary_pivot = summary_pivot.reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-    
-    peaks['peak_time_str'] = peaks['peak_time'].dt.strftime('%d.%m. %H:%M')
-    
+    summary_pivot = (
+        summary.pivot(
+            index="weekday_name", columns="time_slot", values="attendance_count"
+        )
+        .round(0)
+        .fillna(0)
+        .astype(int)
+    )
+    summary_pivot = summary_pivot.reindex(
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    )
+
+    peaks["peak_time_str"] = peaks["peak_time"].dt.strftime("%d.%m. %H:%M")
+
     summary_pivot.reset_index(inplace=True)
-    summary_pivot = summary_pivot.merge(peaks[['weekday_name', 'peak_count', 'peak_time_str']], on='weekday_name', how='left')
-    summary_pivot.set_index('weekday_name', inplace=True)
-    summary_pivot.rename(columns={'peak_count': 'Peak', 'peak_time_str': 'Peak Time'}, inplace=True)
+    summary_pivot = summary_pivot.merge(
+        peaks[["weekday_name", "peak_count", "peak_time_str"]],
+        on="weekday_name",
+        how="left",
+    )
+    summary_pivot.set_index("weekday_name", inplace=True)
+    summary_pivot.rename(
+        columns={"peak_count": "Peak", "peak_time_str": "Peak Time"}, inplace=True
+    )
 
-    header_values = ['Day'] + list(summary_pivot.columns)
-    cell_values = [summary_pivot.index] + [summary_pivot[col] for col in summary_pivot.columns]
+    header_values = ["Day"] + list(summary_pivot.columns)
+    cell_values = [summary_pivot.index] + [
+        summary_pivot[col] for col in summary_pivot.columns
+    ]
 
-    fig = go.Figure(data=[go.Table(
-        header=dict(values=header_values, fill_color='#119DFF', font=dict(color='white', size=12), align='left'),
-        cells=dict(values=cell_values, fill_color='#F0F8FF', align='left'))
-    ])
+    fig = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=header_values,
+                    fill_color="#119DFF",
+                    font=dict(color="white", size=12),
+                    align="left",
+                ),
+                cells=dict(values=cell_values, fill_color="#F0F8FF", align="left"),
+            )
+        ]
+    )
     fig.update_layout(title_text="Weekly Summary and Peak Times")
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return to_plain_json(fig)
+
 
 def create_all_time_chart(df):
-    fig = px.line(df, x='timestamp', y='attendance_count', title='All-Time Attendance')
+    fig = px.line(df, x="timestamp", y="attendance_count", title="All-Time Attendance")
     fig.update_layout(template="plotly_white")
-    return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return to_plain_json(fig)
 
 
 @app.route("/")
@@ -192,7 +327,7 @@ def index():
 
         warning_message = None
         if today_data.empty:
-            now_date = pd.Timestamp.now('Europe/Zurich').strftime('%Y-%m-%d')
+            now_date = pd.Timestamp.now("Europe/Zurich").strftime("%Y-%m-%d")
             warning_message = f"No attendance data found for today ({now_date}). The data from the scraper might be stale or delayed."
 
         data = {

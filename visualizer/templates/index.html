@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🏋️‍♂️ Fitnesspark Attendance Dashboard</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -66,15 +66,16 @@
     </div>
 
     <script>
-        const chart1_data = {{ chart1_json | safe }};
-        const chart2_data = {{ chart2_json | safe }};
-        const table_data = {{ table_json | safe }};
-        const chart3_data = {{ chart3_json | safe }};
+        const chart1_data = {{ chart1_json | tojson | safe }};
+        const chart2_data = {{ chart2_json | tojson | safe }};
+        const table_data  = {{ table_json  | tojson | safe }};
+        const chart3_data = {{ chart3_json | tojson | safe }};
 
         Plotly.newPlot('chart1', chart1_data.data, chart1_data.layout);
         Plotly.newPlot('chart2', chart2_data.data, chart2_data.layout);
-        Plotly.newPlot('table', table_data.data, table_data.layout);
+        Plotly.newPlot('table',  table_data.data,  table_data.layout);
         Plotly.newPlot('chart3', chart3_data.data, chart3_data.layout);
     </script>
+
 </body>
 </html>
