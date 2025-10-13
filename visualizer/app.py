@@ -36,20 +36,19 @@ def load_data_from_gcs():
 
     data_bytes = blob.download_as_bytes()
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("10T")
     df.sort_values("timestamp", inplace=True)
     return df
 
 
 def compute_today_vs_typical(df):
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df["time"] = df["timestamp"].dt.floor("10T").dt.strftime("%H:%M")
+    df["time"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday"] = df["timestamp"].dt.strftime("%A")
 
     today = datetime.now().strftime("%A")
     df_today = df[df["weekday"] == today]
 
-    four_weeks_ago = datetime.now() - timedelta(weeks=4)
+    four_weeks_ago = pd.to_datetime(datetime.now() - timedelta(weeks=4)).floor("10T")
     df_recent = df[df["timestamp"] >= four_weeks_ago]
 
     df_avg = df_recent.groupby(["weekday", "time"])["count"].mean().reset_index()
@@ -60,15 +59,18 @@ def compute_today_vs_typical(df):
     data_avg = df_avg[df_avg["weekday"] == today][["time", "count"]].to_dict(
         orient="records"
     )
+
+    df_today = df_today[(df_today["time"] >= "06:30") & (df_today["time"] <= "22:00")]
+    df_avg = df_avg[(df_avg["time"] >= "06:30") & (df_avg["time"] <= "22:00")]
     return data_today, data_avg
 
 
 def compute_weekly_summary(df):
     now = datetime.now()
-    four_weeks_ago = now - timedelta(weeks=4)
+    four_weeks_ago = pd.to_datetime(now - timedelta(weeks=4)).floor("10T")
     df = df[df["timestamp"] >= four_weeks_ago].copy()
 
-    df["time_slot"] = df["timestamp"].dt.floor("30T").dt.strftime("%H:%M")
+    df["time_slot"] = df["timestamp"].dt.strftime("%H:%M")
     df["weekday_name"] = df["timestamp"].dt.strftime("%A")
 
     pivot = df.groupby(["weekday_name", "time_slot"])["count"].mean().reset_index()
@@ -86,9 +88,8 @@ def compute_weekly_summary(df):
 
 
 def compute_weekly_profiles(df):
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["weekday"] = df["timestamp"].dt.day_name()
-    df["time"] = df["timestamp"].dt.floor("10T").dt.strftime("%H:%M")
+    df["time"] = df["timestamp"].dt.strftime("%H:%M")
 
     df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
 
@@ -117,9 +118,9 @@ def index():
         logger.error(f"Failed to load data: {e}")
         return "Error loading data", 500
 
-    data_today, data_avg = compute_today_vs_typical(df)
-    df_summary, df_peaks = compute_weekly_summary(df)
-    df_profiles = compute_weekly_profiles(df)
+    data_today, data_avg = compute_today_vs_typical(df.copy())
+    df_summary, df_peaks = compute_weekly_summary(df.copy())
+    df_profiles = compute_weekly_profiles(df.copy())
 
     return render_template(
         "index.html",
