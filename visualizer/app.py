@@ -117,6 +117,9 @@ def compute_weekly_profiles(df):
     df_weekly = df.groupby(["weekday", "time"])["count"].mean().reset_index()
     df_weekly.rename(columns={"count": "visitors"}, inplace=True)
 
+    # Filter for opening hours
+    df_weekly = df_weekly[(df_weekly["time"] >= "06:30") & (df_weekly["time"] <= "22:00")]
+
     weekday_order = [
         "Monday",
         "Tuesday",
