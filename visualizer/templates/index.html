@@ -101,7 +101,7 @@
             <th>20:00–21:00</th>
             <th>21:00–22:00</th>
             <th>Peak</th>
-            <th>Time</th>
+            <th>Peak Timestamp</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -238,7 +238,7 @@
             const cellPeak = document.createElement("td");
             cellPeak.textContent = peak ? Math.round(peak.peak_count) : "-";
             const cellTime = document.createElement("td");
-            cellTime.textContent = peak ? new Date(peak.peak_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "-";
+            cellTime.textContent = peak ? new Date(peak.peak_time).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}) : "-";
             row.appendChild(cellPeak);
             row.appendChild(cellTime);
 
