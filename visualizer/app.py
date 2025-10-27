@@ -201,6 +201,9 @@ def to_plain_json(fig):
         elif isinstance(v, (np.floating,)):
             return float(v)
         elif isinstance(v, (np.ndarray,)):
+            # Detect datetime64 arrays and convert to ISO strings
+            if np.issubdtype(v.dtype, np.datetime64):
+                return [pd.Timestamp(x).isoformat() for x in v]
             return v.tolist()
         # convert Plotly sub-objects (Marker, Line, Layout, etc.) to dict
         elif hasattr(v, "to_plotly_json"):
