@@ -43,9 +43,10 @@ def load_data_from_gcs():
     df = pd.read_json(io.BytesIO(data_bytes), lines=True)
     df.rename(columns={"count": "attendance_count"}, inplace=True)
     df["attendance_count"] = pd.to_numeric(df["attendance_count"], errors="coerce")
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
     df.dropna(subset=["timestamp", "attendance_count"], inplace=True)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], format="mixed", utc=True)
-    df["timestamp"] = df["timestamp"].dt.tz_convert("Europe/Zurich").dt.floor("10min")
+    df["timestamp"] = df["timestamp"].dt.floor("10min")
+    df["timestamp"] = df["timestamp"].dt.tz_convert("Europe/Zurich")
     df.sort_values("timestamp", inplace=True)
     return df
 
