@@ -1,14 +1,16 @@
-from flask import Flask, render_template, request, abort
-from google.cloud import storage
-import pandas as pd
+import io
+import json
+import logging
 from datetime import datetime, timedelta
 from time import time
-import io
-import logging
-import json
+
+import numpy as np
+import pandas as pd
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
+from flask import Flask, abort, render_template, request
+from google.cloud import storage
 
 app = Flask(__name__)
 
@@ -188,10 +190,6 @@ def to_plain_json(fig):
     Convert a Plotly Figure into plain JSON (no binary bdata),
     handling numpy, pandas, and Plotly sub-objects like Marker/Line.
     """
-    import json
-    import numpy as np
-    import plotly.utils
-
     def _make_safe(v):
         # --- Recursively clean any object types ---
         if isinstance(v, dict):
@@ -306,10 +304,29 @@ def create_summary_table(summary, peaks):
 
 
 def create_all_time_chart(df):
-    fig = px.line(df, x="timestamp", y="attendance_count", title="All-Time Attendance")
-    fig.update_layout(template="plotly_white")
-    return to_plain_json(fig)
+    fig = px.line(
+        df,
+        x="timestamp",
+        y="attendance_count",
+        title="All-Time Attendance",
+        hover_data={"timestamp": "|%a, %d.%m.%Y, %H:%M"},  # Sun, 26.10.2025, 02:10
+    )
 
+    fig.update_layout(
+        template="plotly_white",
+        xaxis_title="Date",
+        yaxis_title="Visitor Count",
+    )
+
+    # ✅ Format the x-axis to show one tick per day, with weekday + date
+    fig.update_xaxes(
+        dtick=24 * 60 * 60 * 1000,  # one-day spacing in milliseconds
+        tickformat="%A, %d.%m.%Y",  # e.g. Sunday, 26.10.2025
+        tickangle=45,
+        showgrid=True,
+    )
+
+    return to_plain_json(fig)
 
 @app.route("/")
 def index():
