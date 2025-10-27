@@ -185,7 +185,7 @@ def test_index_route_with_plotly(mock_load_data, mock_pd_timestamp_now, client):
     response = client.get('/')
     
     assert response.status_code == 200
-    assert b'Fitnesspark Attendance Dashboard' in response.data
+    assert b'Fitnesspark Baden Trafo Attendance Dashboard' in response.data
     assert b'Today vs. Typical Attendance' in response.data
     assert b'Weekly Attendance Patterns' in response.data
     assert b'Weekly Summary and Peak Times' in response.data
