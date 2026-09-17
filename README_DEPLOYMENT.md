@@ -41,7 +41,9 @@ gcloud artifacts repositories create fitnesspark-attendance \
 Used to store attendance logs.
 
 ```bash
-gsutil mb -p fitnesspark-attendance -l europe-west6 gs://fitnesspark-attendance-data/
+gcloud storage buckets create gs://fitnesspark-attendance-data/ \
+  --project=fitnesspark-attendance \
+  --location=europe-west6
 ```
 
 ### 1.5 Grant Permissions to Cloud Run Service Account
@@ -50,7 +52,9 @@ Cloud Run Jobs use a service account to access resources. Ensure it can write to
 
 ```bash
 export PROJECT_NUMBER=$(gcloud projects describe fitnesspark-attendance --format="value(projectNumber)")
-gsutil iam ch serviceAccount:service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com:roles/storage.objectAdmin gs://fitnesspark-attendance-data
+gcloud storage buckets add-iam-policy-binding gs://fitnesspark-attendance-data \
+  --member="serviceAccount:service-${PROJECT_NUMBER}@serverless-robot-prod.iam.gserviceaccount.com" \
+  --role="roles/storage.objectAdmin"
 ```
 
 ---
@@ -189,7 +193,7 @@ gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name=
 ### Inspect Cloud Storage Data
 
 ```bash
-gsutil cat gs://fitnesspark-attendance-data/attendance/attendance_data.jsonl
+gcloud storage cat gs://fitnesspark-attendance-data/attendance/attendance_data.jsonl
 ```
 
 ### List Executions
