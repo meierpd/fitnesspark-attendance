@@ -22,7 +22,7 @@ This enables later visualization of gym attendance trends over time.
 Cloud Scheduler → Cloud Run Job → Python scraper → Cloud Storage
 ```
 
-1. **Cloud Scheduler** triggers the job every 10 minutes.
+1. **Cloud Scheduler** triggers the job every 10 minutes during opening hours (Mon–Fri 06:30–22:00; Sat–Sun 09:00–20:00, Europe/Zurich; closing time excluded).
 2. **Cloud Run Job** runs the Python scraper container.
 3. **Python scraper** fetches data from the Fitnesspark website.
 4. **Cloud Storage** stores results in `gs://fitnesspark-attendance-data/attendance/attendance_data.jsonl`.
@@ -45,7 +45,7 @@ To run locally for testing:
 
 ```bash
 # Create and activate virtual environment
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
