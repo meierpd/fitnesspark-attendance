@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+**/__pycache__
+.pytest_cache
+*.log
+.env
+.env.*
+config-local.yaml
+visualizer/
+tests/
+ops/
+*.md

@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+**/__pycache__
+.pytest_cache
+*.log
+.env
+.env.*
+config-local.yaml
+test_*.py
+requirements-dev.txt
+*.md

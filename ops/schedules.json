@@ -1,0 +1,5 @@
+{
+  "fitnesspark-attendance-schedule": "*/10 7-21 * * 1-5",
+  "fitnesspark-attendance-weekday-opening": "30,40,50 6 * * 1-5",
+  "fitnesspark-attendance-weekend": "*/10 9-19 * * 0,6"
+}
